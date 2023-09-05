@@ -62,6 +62,8 @@ class Settings(object):
         self.DISABLE_SSO = False
         self.GROUP_TO_FLAG_MAPPING = {}
         self.GROUPS_CLAIM = "group"
+        self.ROLE_TO_FLAG_MAPPING = {}
+        self.ROLES_CLAIM = "roles"
         self.LOGIN_EXEMPT_URLS = []
         self.MIRROR_GROUPS = False
         self.RELYING_PARTY_ID = None  # Required

@@ -181,6 +181,7 @@ class AdfsBaseBackend(ModelBackend):
         self.update_user_attributes(user, claims)
         self.update_user_groups(user, groups)
         self.update_user_flags(user, claims, groups)
+        self.update_user_from_roles(user, claims)
 
         signals.post_authenticate.send(
             sender=self,
@@ -228,6 +229,7 @@ class AdfsBaseBackend(ModelBackend):
 
         return groups
 
+
     def create_user(self, claims):
         """
         Create the user if it doesn't exist yet
@@ -273,6 +275,7 @@ class AdfsBaseBackend(ModelBackend):
             user.set_unusable_password()
         return user
 
+
     # https://github.com/snok/django-auth-adfs/issues/241
     def update_user_attributes(self, user, claims, claim_mapping=None):
         """
@@ -313,6 +316,7 @@ class AdfsBaseBackend(ModelBackend):
                 msg = "Model '{}' has no field named '{}'. Check ADFS claims mapping."
                 raise ImproperlyConfigured(msg.format(user._meta.model_name, field))
 
+
     def update_user_groups(self, user, claim_groups):
         """
         Updates user group memberships based on the GROUPS_CLAIM setting.
@@ -344,6 +348,7 @@ class AdfsBaseBackend(ModelBackend):
                 else:
                     # Associate the user to only existing claimed groups
                     user.groups.set(existing_claimed_groups)
+
 
     def update_user_flags(self, user, claims, claim_groups):
         """
@@ -380,6 +385,34 @@ class AdfsBaseBackend(ModelBackend):
             else:
                 msg = "User model has no field named '{}'. Check ADFS boolean claims mapping."
                 raise ImproperlyConfigured(msg.format(field))
+
+
+    def update_user_from_roles(self, user, claims):
+
+        #setting flags
+        if settings.ROLE_TO_FLAG_MAPPING is not None:
+            for flag, role in settings.ROLE_TO_FLAG_MAPPING.items():
+                if hasattr(user, flag):
+                    if role in claims[settings.ROLES_CLAIM]:
+                        value = True
+                    else:
+                        value = False
+
+                    setattr(user, flag, value)
+                    logger.debug("Attribute '%s' for user '%s' was set to '%s'.", flag, user, value)
+                else:
+                    msg = "User model has no field named '{}'. Check ADFS boolean claims mapping."
+                    raise ImproperlyConfigured(msg.format(flag))
+
+        #setting groups
+        if settings.ROLES_CLAIM is not None:
+            all_groups = Group.objects.all()
+            assignable_user_groups = []
+            for role in claims[settings.ROLES_CLAIM]:
+                a_group = all_groups.filter(name__in=[role])
+                if len(a_group):
+                    assignable_user_groups.append(a_group[0])
+            user.groups.set(assignable_user_groups)
 
 
 class AdfsAuthCodeBackend(AdfsBaseBackend):
